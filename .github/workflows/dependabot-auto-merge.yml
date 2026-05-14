@@ -1,0 +1,52 @@
+# Approve and enable auto-merge for Dependabot PRs.
+#
+# IMPORTANT: this only adds safety on top of branch protection. To prevent
+# auto-merge from landing changes before CI completes, configure the `main`
+# branch with a branch-protection rule that requires the CI jobs as status
+# checks. Without that, the auto-merge will fire as soon as it's queued.
+name: Dependabot Auto Merge
+
+on:
+  pull_request_target:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  dependabot-auto-merge:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Approve PR
+        if: >
+          steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-minor' ||
+          (steps.metadata.outputs.update-type == 'version-update:semver-major' &&
+           steps.metadata.outputs.package-ecosystem == 'github_actions')
+        uses: actions/github-script@v9
+        with:
+          script: |
+            await github.rest.pulls.createReview({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              event: "APPROVE"
+            });
+
+      - name: Enable auto-merge
+        if: >
+          steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-minor' ||
+          (steps.metadata.outputs.update-type == 'version-update:semver-major' &&
+           steps.metadata.outputs.package-ecosystem == 'github_actions')
+        uses: peter-evans/enable-pull-request-automerge@v3
+        with:
+          pull-request-number: ${{ github.event.pull_request.number }}
+          merge-method: squash

@@ -1,0 +1,51 @@
+version: "2"
+
+formatters:
+  enable:
+    - gofmt
+
+linters:
+  enable:
+    - errcheck
+    - gosec
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gocritic
+    - revive
+    - misspell
+
+  settings:
+    revive:
+      rules:
+        - name: exported
+          disabled: true
+
+    errcheck:
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+
+    gosec:
+      excludes:
+        - G104 # unhandled errors (covered by errcheck with more granularity)
+        - G115 # integer overflow conversion (noisy on duration/exit-code casts)
+        - G304 # file inclusion via variable (intentional in tests)
+        - G705 # XSS via taint analysis (false positive for a CLI tool — no HTTP sinks)
+
+  exclusions:
+    rules:
+      # Test files: allow unchecked errors for test setup/teardown.
+      - linters:
+          - errcheck
+        path: _test\.go
+      # Test files exec.Command the built binary; the variable arg is intentional.
+      - linters:
+          - gosec
+        path: _test\.go
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

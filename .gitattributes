@@ -1,0 +1,12 @@
+# `arc-enroll.sh` is //go:embed'd into the arcify binary and dispatched to
+# Linux VMs over runCommand. CRLF would inject a literal '\r' onto the end
+# of every line and break bash. Force LF regardless of where the repo is
+# cloned.
+*.sh text eol=lf
+
+# PowerShell tolerates LF or CRLF; keep LF for consistency with how the
+# file is authored in this repo.
+*.ps1 text eol=lf
+
+# Default: normalize text files; let git autodetect binary.
+* text=auto

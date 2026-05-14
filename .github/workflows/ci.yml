@@ -1,0 +1,89 @@
+name: ci
+
+on:
+  push:
+    branches: [main, "dependabot/**"]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: stable
+      - run: go vet ./...
+      - run: go build ./...
+      - run: go test -race ./...
+
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: stable
+
+      - name: prettier
+        run: npx --yes prettier --check .
+
+      - name: shfmt
+        run: |
+          go install mvdan.cc/sh/v3/cmd/shfmt@latest
+          shfmt -i 2 -bn -d .
+
+      - name: shellcheck
+        run: shellcheck $(git ls-files '*.sh')
+
+      - name: PSScriptAnalyzer + Invoke-Formatter
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force -SkipPublisherCheck
+          $failed = $false
+          foreach ($f in (git ls-files '*.ps1')) {
+            $diag = Invoke-ScriptAnalyzer -Path $f
+            if ($diag) {
+              $diag | Format-Table -AutoSize
+              $failed = $true
+            }
+            $src = Get-Content -Raw $f
+            $dst = Invoke-Formatter -ScriptDefinition $src
+            if ($src -ne $dst) {
+              Write-Output "::error file=$f::Invoke-Formatter would rewrite this file"
+              $failed = $true
+            }
+          }
+          if ($failed) { exit 1 }
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: stable
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.10
+
+  vulncheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: stable
+      - name: govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...

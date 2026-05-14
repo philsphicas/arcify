@@ -1,0 +1,6 @@
+/arcify
+/arcify-*
+/dist/
+*.test
+*.out
+*.pem
